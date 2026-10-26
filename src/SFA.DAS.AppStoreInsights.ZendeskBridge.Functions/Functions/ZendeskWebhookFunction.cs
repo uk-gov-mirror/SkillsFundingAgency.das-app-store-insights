@@ -98,7 +98,7 @@ namespace SFA.DAS.AppStoreInsights.ZendeskBridge.Functions
                     var comments = await _zendeskClient.GetTicketCommentsAsync(review.ZendeskTicketId!, CancellationToken.None);
 
                     var agentReply = comments
-                        .Where(c => c.Public && string.Equals(c.AuthorRole, "agent", StringComparison.OrdinalIgnoreCase))
+                        .Where(c => c.Public && IsStaffRole(c.AuthorRole))
                         .OrderByDescending(c => c.CreatedAt)
                         .FirstOrDefault();
 
@@ -155,6 +155,11 @@ namespace SFA.DAS.AppStoreInsights.ZendeskBridge.Functions
                 }
             }
         }
+
+        // Zendesk gives admins the role "admin" rather than "agent"; both are staff replies.
+        private static bool IsStaffRole(string role) =>
+            string.Equals(role, "agent", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(role, "admin", StringComparison.OrdinalIgnoreCase);
 
         private async Task UpdateZendeskResponseField(string ticketId, string responseText)
         {

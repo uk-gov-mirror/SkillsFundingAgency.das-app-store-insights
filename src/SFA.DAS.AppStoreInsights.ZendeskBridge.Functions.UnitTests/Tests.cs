@@ -220,6 +220,43 @@ namespace SFA.DAS.AppStoreInsights.ZendeskBridge.Functions.UnitTests
         }
 
         [Test]
+        public async Task RunSyncReplies_WhenAdminReplyExists_PostsReplyAndSavesResponse()
+        {
+            var review = new Review
+            {
+                Id = 1,
+                VendorId = 1,
+                ExternalId = "apple_review_1",
+                ZendeskTicketId = "12345"
+            };
+
+            var comments = new List<ZendeskComment>
+            {
+                new ZendeskComment
+                {
+                    Id = "comment_1",
+                    Body = "Thanks, we're looking into this.",
+                    AuthorRole = "admin",
+                    Public = true,
+                    CreatedAt = DateTime.UtcNow
+                }
+            };
+
+            _repoMock.Setup(x => x.GetAppIdAsync("Apprentice App", It.IsAny<CancellationToken>())).ReturnsAsync(1);
+            _repoMock.Setup(x => x.GetReviewsWithTicketButNoResponseAsync(1, It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new[] { review });
+            _zendeskClientMock.Setup(x => x.GetTicketCommentsAsync("12345", It.IsAny<CancellationToken>()))
+                .ReturnsAsync(comments);
+            _repoMock.Setup(x => x.ResponseExistsForReviewAsync(1, "comment_1", It.IsAny<CancellationToken>()))
+                .ReturnsAsync(false);
+
+            await _function.RunSyncReplies(new TimerInfo());
+
+            _appleClientMock.Verify(x => x.PostResponseAsync("apple123", "apple_review_1", "Thanks, we're looking into this.", It.IsAny<CancellationToken>()), Times.Once);
+            _repoMock.Verify(x => x.InsertResponseAsync(1, "Thanks, we're looking into this.", "SupportAgent", It.IsAny<DateTime>(), It.IsAny<CancellationToken>(), "comment_1"), Times.Once);
+        }
+
+        [Test]
         public async Task RunSyncReplies_WhenGoogleReview_ShouldPostToGoogle()
         {
             var review = new Review
